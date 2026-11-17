@@ -1,5 +1,7 @@
 # SiteSnag — free website & file downloader
 
+**🌐 Use it online: https://sitesnag-m6f3.onrender.com** (free hosting — the first visit after a quiet spell can take up to a minute to wake up)
+
 Paste a website and get it as a ZIP that works offline, or paste a file link (even a deleted one) and SiteSnag
 digs it up from the live site, the Internet Archive's Wayback Machine, or GitHub.
 
@@ -10,7 +12,8 @@ digs it up from the live site, the Internet Archive's Wayback Machine, or GitHub
 - GitHub downloads are checked against GitHub's own SHA-256 checksums
 - No signup, no limits, no dependencies — just Node.js
 
-**If the website is ever down, you can run SiteSnag yourself — see option 1.**
+**If the website is ever down, you can run SiteSnag yourself — download `sitesnag.zip` from
+[Releases](https://github.com/Vader2-2/sitesnag/releases/latest) and see option 1.**
 
 ---
 
