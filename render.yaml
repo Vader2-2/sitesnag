@@ -1,0 +1,16 @@
+# Render blueprint: https://render.com/docs/blueprint-spec
+# In Render: New > Blueprint > pick this repo. Everything below is filled in for you.
+services:
+  - type: web
+    name: sitesnag
+    runtime: node
+    plan: free
+    buildCommand: "true"        # no dependencies to install
+    startCommand: node server.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Optional: a GitHub token raises the GitHub lookup limit from 60 to 5000 per hour.
+      - key: GITHUB_TOKEN
+        sync: false

@@ -1,0 +1,14 @@
+{
+  "name": "sitesnag",
+  "version": "1.0.0",
+  "description": "Free website and file downloader with Internet Archive and GitHub recovery",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

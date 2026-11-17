@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SiteSnag — Free Website Downloader</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2322c55e'/><path d='M16 7v13m-6-6 6 6 6-6M9 24h14' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #121821; --panel2: #18202b; --line: #233042;
+    --text: #e6edf3; --muted: #8b98a8; --accent: #22c55e; --accent2: #16a34a; --err: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 50% -200px, #12321f 0%, var(--bg) 60%) fixed;
+    color: var(--text); min-height: 100vh;
+  }
+  header { display: flex; align-items: center; gap: 10px; padding: 20px 28px; max-width: 1000px; margin: 0 auto; }
+  .logo { width: 34px; height: 34px; border-radius: 9px; background: var(--accent); display: grid; place-items: center; }
+  header b { font-size: 20px; letter-spacing: -.3px; }
+  header .tag { margin-left: auto; font-size: 13px; color: var(--accent); border: 1px solid #1f5135; padding: 4px 10px; border-radius: 99px; }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: clamp(32px, 6vw, 52px); line-height: 1.08; letter-spacing: -1.5px; margin: 0 0 14px; text-align: center; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--muted); text-align: center; font-size: 18px; margin: 0 auto 36px; max-width: 560px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: 0 20px 60px #0006; }
+  .row { display: flex; gap: 10px; }
+  input[type=text] {
+    flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); color: var(--text);
+    padding: 14px 16px; border-radius: 10px; font-size: 16px; outline: none;
+  }
+  input[type=text]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #22c55e33; }
+  button {
+    background: var(--accent); color: #04140a; border: 0; padding: 0 22px; border-radius: 10px;
+    font-weight: 700; font-size: 16px; cursor: pointer; white-space: nowrap;
+  }
+  button:hover { background: var(--accent2); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .opts { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 16px; color: var(--muted); font-size: 14px; align-items: center; }
+  .opts label { display: flex; align-items: center; gap: 8px; }
+  .opts select { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .opts input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
+  #status { margin-top: 20px; display: none; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+  .stat { background: var(--panel2); border-radius: 10px; padding: 10px 12px; }
+  .stat small { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+  .stat div { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .hint { color: var(--accent); font-size: 13px; }
+  .fileBox { display: none; background: var(--panel2); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+  .fileName { font-weight: 700; word-break: break-all; }
+  .progress { height: 8px; background: var(--bg); border-radius: 8px; overflow: hidden; margin: 10px 0 8px; }
+  .progress b { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .fileMeta { color: var(--muted); font-size: 13px; word-break: break-all; }
+  .fileMeta code { color: var(--text); }
+  .alts { display: none; margin-bottom: 12px; }
+  .alts h4 { margin: 4px 0 8px; font-size: 15px; }
+  .alt { display: flex; gap: 12px; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .alt div { min-width: 0; }
+  .alt b { word-break: break-all; }
+  .alt small { display: block; color: var(--muted); }
+  .alt small.warn { color: #fbbf24; }
+  .alt button { padding: 9px 14px; font-size: 14px; }
+  .snap { display: none; background: #1f513526; border: 1px solid #1f5135; color: var(--text); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 14px; }
+  .snap a { color: var(--accent); }
+  .bar { height: 4px; background: var(--panel2); border-radius: 4px; overflow: hidden; margin-bottom: 12px; }
+  .bar i { display: block; height: 100%; width: 30%; background: var(--accent); animation: slide 1.2s infinite ease-in-out; }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+  pre {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin: 0;
+    height: 180px; overflow: auto; font: 12px/1.6 ui-monospace, Consolas, monospace; color: var(--muted); white-space: pre-wrap; word-break: break-all;
+  }
+  .msg { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .msg.err { color: var(--err); }
+  a.dl { background: var(--accent); color: #04140a; text-decoration: none; font-weight: 700; padding: 12px 20px; border-radius: 10px; }
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 48px; }
+  .feature { border: 1px solid var(--line); border-radius: 14px; padding: 18px; background: #121821aa; }
+  .feature h3 { margin: 0 0 6px; font-size: 16px; }
+  .feature p { margin: 0; color: var(--muted); font-size: 14px; }
+  .faq { margin-top: 48px; }
+  .faq h2 { font-size: 22px; }
+  details { border-bottom: 1px solid var(--line); padding: 14px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  details p { color: var(--muted); margin: 8px 0 0; }
+  footer { text-align: center; color: var(--muted); font-size: 13px; padding: 30px; }
+  @media (max-width: 560px) { .row { flex-direction: column; } button { padding: 14px; } .stats { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><svg width="20" height="20" viewBox="0 0 32 32"><path d="M16 5v15m-7-7 7 7 7-7M8 26h16" stroke="#04140a" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <b>SiteSnag</b>
+  <span class="tag">100% free · no signup</span>
+</header>
+
+<main>
+  <h1>Download any website or file <span>for free</span></h1>
+  <p class="sub">Paste a website to get it as a ZIP that works offline — or paste a file link, even one that has been deleted, and we'll dig it up from the Internet Archive or GitHub.</p>
+
+  <div class="card">
+    <form id="form" class="row">
+      <input id="url" type="text" placeholder="https://example.com" autocomplete="off" required>
+      <button id="go" type="submit">Download</button>
+    </form>
+    <div class="opts">
+      <label>What to download
+        <select id="kind">
+          <option value="auto" selected>Detect automatically</option>
+          <option value="site">Website (ZIP)</option>
+          <option value="file">Single file</option>
+          <option value="scan">Find downloadable files on this page</option>
+        </select>
+      </label>
+      <span class="hint" id="kindHint"></span>
+      <label>Source
+        <select id="source">
+          <option value="auto" selected>Live (use archive if it's gone)</option>
+          <option value="live">Live only</option>
+          <option value="wayback">Internet Archive only</option>
+        </select>
+      </label>
+    </div>
+    <div class="opts" id="siteOpts">
+      <label>Pages
+        <select id="maxPages">
+          <option value="1">Just this page</option>
+          <option value="10">Up to 10</option>
+          <option value="50" selected>Up to 50</option>
+          <option value="200">Up to 200</option>
+          <option value="500">Up to 500</option>
+        </select>
+      </label>
+      <label>Link depth
+        <select id="maxDepth">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="5">5</option>
+          <option value="10">10</option>
+        </select>
+      </label>
+      <label><input id="external" type="checkbox" checked> Include assets from CDNs / other domains</label>
+      <label><input id="bundle" type="checkbox"> Also put the files the page links to (installers, zips…) in the ZIP</label>
+    </div>
+
+    <div id="status">
+      <div class="fileBox" id="fileBox">
+        <div class="fileName" id="fName">Looking for the file…</div>
+        <div class="progress"><b id="fBar"></b></div>
+        <div class="fileMeta" id="fMeta"></div>
+      </div>
+      <div class="alts" id="alts"></div>
+      <div class="alts" id="found"></div>
+      <div class="stats" id="siteStats">
+        <div class="stat"><small>Pages</small><div id="sPages">0</div></div>
+        <div class="stat"><small>Files</small><div id="sFiles">0</div></div>
+        <div class="stat"><small>Size</small><div id="sSize">0 KB</div></div>
+        <div class="stat"><small>Skipped</small><div id="sFailed">0</div></div>
+      </div>
+      <div class="snap" id="snap"></div>
+      <div class="bar" id="bar"><i></i></div>
+      <pre id="log"></pre>
+      <div class="msg" id="msg"></div>
+    </div>
+  </div>
+
+  <section class="features">
+    <div class="feature"><h3>Works offline</h3><p>Every link, stylesheet and image is rewritten to point at the local copy.</p></div>
+    <div class="feature"><h3>Whole site or one page</h3><p>Crawl up to 500 pages on the same domain, breadth-first.</p></div>
+    <div class="feature"><h3>Assets included</h3><p>CSS backgrounds, fonts, srcset images, favicons and scripts.</p></div>
+    <div class="feature"><h3>No limits, no account</h3><p>Self-hosted and open — no paywall, no email, no watermark.</p></div>
+  </section>
+
+  <section class="faq">
+    <h2>FAQ</h2>
+    <details><summary>How do I open the downloaded site?</summary><p>Unzip it and open <code>index.html</code> in your browser. If parts of the page are missing (big sites like GitHub need their JavaScript), double-click <code>Open site.bat</code> instead, or run <code>node serve.js</code> on Mac/Linux, to view it through the included mini web server.</p></details>
+    <details><summary>What if the site is down or has changed?</summary><p>Choose “Latest working Wayback snapshot”, or paste a <code>web.archive.org/web/…</code> link. SiteSnag checks the Internet Archive's most recent captures, newest first, skips broken ones, and rebuilds the site from the first one that loads. In the default mode this happens automatically when the live site can't be reached.</p></details>
+    <details><summary>Does it work with React / single-page apps?</summary><p>It saves what the server sends. Sites that build all their content with JavaScript at runtime may need an internet connection for their API calls to work.</p></details>
+    <details><summary>Can I download any site?</summary><p>Only download sites you own or have permission to copy, and respect the site's terms and copyright.</p></details>
+  </section>
+</main>
+<footer>SiteSnag · free and open source</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+let jobId = null, timer = null;
+const fmt = b => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+// Rough client-side guess, only for showing the right options; the server decides for real.
+const FILE_RE = /\.(exe|msi|zip|rar|7z|tar|gz|tgz|dmg|pkg|deb|rpm|apk|iso|jar|dll|pdf|mp4|mp3|appimage|rbxm|rbxl|unitypackage|whl|vsix)$/i;
+function guessKind() {
+  if ($('kind').value !== 'auto') return $('kind').value;
+  let v = $('url').value.trim();
+  const wb = v.match(/web\.archive\.org\/web\/[^/]+\/(.+)$/i);
+  if (wb) v = wb[1];
+  try {
+    const u = new URL(/^https?:\/\//i.test(v) ? v : 'https://' + v);
+    if (/githubusercontent\.com$|^codeload\.github\.com$/.test(u.hostname)) return 'file';
+    if (u.hostname === 'github.com' && /\/(releases\/(latest\/)?download|archive|raw)\//.test(u.pathname)) return 'file';
+    return FILE_RE.test(u.pathname) ? 'file' : 'site';
+  } catch { return 'site'; }
+}
+function updateKind() {
+  const k = guessKind();
+  $('siteOpts').style.display = k === 'site' ? 'flex' : 'none';
+  $('kindHint').textContent = $('kind').value === 'auto' && $('url').value.trim()
+    ? (k === 'file' ? '→ looks like a file link' : '→ looks like a website') : '';
+}
+$('url').addEventListener('input', updateKind);
+$('kind').addEventListener('change', updateKind);
+
+$('form').addEventListener('submit', e => { e.preventDefault(); start($('url').value, $('kind').value); });
+
+async function start(url, kind, expectSha, keepFound) {
+  if (jobId) return;
+  $('status').style.display = 'block';
+  $('bar').style.display = 'block';
+  $('log').textContent = '';
+  $('snap').style.display = 'none';
+  $('alts').style.display = 'none';
+  if (!keepFound) $('found').style.display = 'none';
+  $('fileBox').style.display = 'none';
+  $('siteStats').style.display = 'none';
+  $('msg').className = 'msg';
+  $('msg').innerHTML = '<button class="ghost" id="cancel" type="button">Cancel</button>';
+  $('cancel').onclick = () => jobId && fetch(`/api/jobs/${jobId}/cancel`, { method: 'POST' });
+  $('go').disabled = true; $('go').textContent = 'Working…';
+  try {
+    const r = await fetch('/api/jobs', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url, kind, source: $('source').value, maxPages: $('maxPages').value, maxDepth: $('maxDepth').value, external: $('external').checked, bundle: $('bundle').checked, expectSha }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Request failed');
+    jobId = d.id;
+    if (d.kind === 'file') { $('fileBox').style.display = 'block'; $('fName').textContent = 'Looking for the file…'; $('fBar').style.width = '0'; $('fMeta').textContent = ''; }
+    else $('siteStats').style.display = 'grid';
+    poll();
+  } catch (err) { finish(err.message); }
+}
+
+const SOURCE_LABEL = { live: 'Original link', wayback: 'Internet Archive', github: 'GitHub (new location)', 'github-copy': 'Copy of the repo on GitHub' };
+
+async function poll() {
+  try {
+    const r = await fetch('/api/jobs/' + jobId);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    $('log').textContent = d.log.join('\n'); $('log').scrollTop = 1e9;
+    if (d.kind === 'file') renderFile(d);
+    else {
+      $('sPages').textContent = d.pages; $('sFiles').textContent = d.files;
+      $('sSize').textContent = fmt(d.bytes); $('sFailed').textContent = d.failed;
+      if (d.snapshot) {
+        const date = new Date(d.snapshot.date + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+        $('snap').style.display = 'block';
+        $('snap').innerHTML = `🕘 Rebuilt from the Internet Archive snapshot of <b>${date}</b> · <a href="${esc(d.snapshot.view)}" target="_blank" rel="noopener">view it on the Wayback Machine</a>`;
+      }
+    }
+    if (d.status === 'done' && d.kind === 'scan') {
+      finish();
+      renderFound(d.foundFiles, 'scan');
+      if (!d.foundFiles.length) { $('msg').className = 'msg err'; $('msg').textContent = 'No downloadable files are linked on this page.'; }
+    } else if (d.status === 'done') {
+      const id = jobId; finish();
+      if (d.kind === 'site') renderFound(d.foundFiles, 'site');
+      const label = d.kind === 'file' ? `⬇ Save ${esc(d.fileName)} (${fmt(d.size)})` : `⬇ Download ZIP (${fmt(d.zipSize)})`;
+      $('msg').innerHTML = `<a class="dl" href="/api/jobs/${id}/download">${label}</a>` +
+        (d.truncated ? '<span>Size limit reached — some files were left out.</span>' : '');
+      location.href = `/api/jobs/${id}/download`;
+    } else if (d.status === 'not_found') { finish(d.error); renderAlts(d.alternatives); }
+    else if (d.status === 'error') finish(d.error);
+    else { if (d.status === 'packaging') $('log').textContent += '\nBuilding ZIP…'; timer = setTimeout(poll, 600); }
+  } catch (err) { finish(err.message); }
+}
+
+function renderFile(d) {
+  const name = d.fileName || (d.target ? decodeURIComponent(d.target.split('/').pop()) : 'file');
+  $('fName').textContent = name;
+  const pct = d.status === 'done' ? 100 : d.total ? Math.min(100, d.bytes / d.total * 100) : 0;
+  $('fBar').style.width = pct + '%';
+  if (d.status === 'done') {
+    $('fMeta').innerHTML = `${fmt(d.size)} · <b>${esc(SOURCE_LABEL[d.source] || d.source)}</b> — ${esc(d.sourceNote)}<br>SHA-256: <code>${esc(d.sha256)}</code>` + (d.verified ? `<br>${/^(Identical|Matches)/.test(d.verified) ? "✅" : "⚠"} ${esc(d.verified)}` : "");
+  } else if (d.status === 'downloading' || d.bytes) {
+    $('fMeta').textContent = d.bytes ? `${fmt(d.bytes)}${d.total ? ' of ' + fmt(d.total) : ''}` : 'Connecting…';
+  } else $('fMeta').textContent = { 'searching archive': 'Searching the Internet Archive…', 'searching github': 'Checking GitHub…' }[d.status] || 'Working…';
+}
+
+function renderAlts(alts) {
+  if (!alts || !alts.length) return;
+  $('alts').style.display = 'block';
+  $('alts').innerHTML = '<h4>Did you mean one of these?</h4>' + alts.map((a, i) => `
+    <div class="alt"><div>
+      <b>${esc(a.name)}</b> <small>${esc(a.size)} · ${esc(a.repo)} · release ${esc(a.release)}${a.date ? ' · ' + esc(a.date) : ''}</small>
+      <small>${esc(a.reason)}</small>
+      ${a.mirror ? '<small class="warn">⚠ From someone else\'s copy of the repo, not the original author — only run it if you trust it.</small>' : ''}
+    </div><button type="button" data-i="${i}">Download</button></div>`).join('');
+  $('alts').querySelectorAll('button').forEach(b => b.onclick = () => start(alts[b.dataset.i].url, 'file'));
+}
+
+// Download links found on the page(s), each with a button that runs the full file recovery.
+function renderFound(files, mode) {
+  if (!files || !files.length) return;
+  $('found').style.display = 'block';
+  const head = mode === 'scan'
+    ? `<h4>Found ${files.length} downloadable file${files.length === 1 ? '' : 's'} on this page</h4>`
+    : `<h4>Files this page links to (${files.length})</h4>`;
+  $('found').innerHTML = head + files.map((f, i) => `
+    <div class="alt"><div>
+      <b>${esc(f.name)}</b>
+      <small>${esc(f.url)}</small>
+      ${f.sha256 ? `<small>Original page lists SHA-256 <code>${esc(f.sha256.slice(0, 16))}…</code> — your download will be checked against it</small>` : ''}
+      ${f.status === 'included' ? `<small>✅ Included in the ZIP as <code>${esc(f.local)}</code>${f.verified ? ' · ' + esc(f.verified) : ''}</small>` : ''}
+      ${f.status === 'not found' ? `<small class="warn">⚠ Couldn't be recovered for the ZIP: ${esc(f.error)}</small>` : ''}
+      ${f.status === 'too big to bundle' ? '<small class="warn">⚠ Left out of the ZIP (size limit)</small>' : ''}
+    </div><button type="button" data-i="${i}">Download</button></div>`).join('');
+  $('found').querySelectorAll('button').forEach(b => b.onclick = () => {
+    const f = files[b.dataset.i];
+    start(f.url, 'file', f.sha256 || undefined, true);
+  });
+}
+
+function finish(error) {
+  jobId = null; clearTimeout(timer);
+  $('go').disabled = false; $('go').textContent = 'Download';
+  $('bar').style.display = 'none';
+  if (error) { $('msg').className = 'msg err'; $('msg').textContent = error; }
+}
+</script>
+</body>
+</html>
