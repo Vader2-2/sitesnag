@@ -655,7 +655,7 @@ http.createServer(async (req, res) => {
       return sendJson(res, 200, {
         status: job.status, pages: job.pages, files: job.files, bytes: job.bytes, failed: job.failed,
         kind: job.kind, total: job.total || 0, fileName: job.fileName, size: job.size, sha256: job.sha256,
-        source: job.source, sourceNote: job.sourceNote, verified: job.verified, alternatives: job.alternatives || [], target: job.target,
+        source: job.source, sourceNote: job.sourceNote, verified: job.verified, archiveProgress: job.archiveProgress || null, alternatives: job.alternatives || [], target: job.target,
         foundFiles: job.foundFiles || [], expectSha: job.opts.expectSha || null,
         snapshot: job.snapshot || null, error: job.error, truncated: !!job.truncated, zipSize: job.zip ? job.zip.length : 0, log: job.log.slice(-40),
       });

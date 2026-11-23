@@ -283,6 +283,9 @@ function renderFile(d) {
   $('fBar').style.width = pct + '%';
   if (d.status === 'done') {
     $('fMeta').innerHTML = `${fmt(d.size)} · <b>${esc(SOURCE_LABEL[d.source] || d.source)}</b> — ${esc(d.sourceNote)}<br>SHA-256: <code>${esc(d.sha256)}</code>` + (d.verified ? `<br>${/^(Identical|Matches)/.test(d.verified) ? "✅" : "⚠"} ${esc(d.verified)}` : "");
+  } else if (d.status === 'searching archive' && d.archiveProgress) {
+    const p = d.archiveProgress;
+    $('fMeta').textContent = `Checking archived copy ${p.tried} of ${p.of}` + (d.bytes ? ` · ${fmt(d.bytes)}${d.total ? ' of ' + fmt(d.total) : ''}` : '…');
   } else if (d.status === 'downloading' || d.bytes) {
     $('fMeta').textContent = d.bytes ? `${fmt(d.bytes)}${d.total ? ' of ' + fmt(d.total) : ''}` : 'Connecting…';
   } else $('fMeta').textContent = { 'searching archive': 'Searching the Internet Archive…', 'searching github': 'Checking GitHub…' }[d.status] || 'Working…';

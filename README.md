@@ -8,7 +8,7 @@ digs it up from the live site, the Internet Archive's Wayback Machine, or GitHub
 - Websites: HTML, CSS, JS, images and fonts, with links rewritten so the copy works offline. Each ZIP includes
   `Open site.bat` / `serve.js`, a tiny viewer for JavaScript-heavy sites that don't work when opened from disk
 - Dead or changed sites: rebuilds from the newest Wayback Machine snapshot that actually loads
-- Files: live link → Internet Archive → GitHub release lookup, with suggestions when the exact file is gone
+- Files: live link → every saved Internet Archive copy (newest first, skipping broken, cut-off or wrong ones) → GitHub release lookup, with suggestions when the exact file is gone
 - GitHub downloads are checked against GitHub's own SHA-256 checksums
 - No signup, no limits, no dependencies — just Node.js
 

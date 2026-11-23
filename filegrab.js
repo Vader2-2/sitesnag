@@ -78,6 +78,7 @@ async function streamToFile(url, job, { assertPublicHost, expectBinary }) {
       throw e;
     }
     if (job.bytes === 0) { fs.rm(dest, { force: true }, () => {}); throw new Error('Empty response'); }
+    if (total && job.bytes < total) { fs.rm(dest, { force: true }, () => {}); throw new Error(`Incomplete (${job.bytes} of ${total} bytes)`); }
     return { path: dest, finalUrl: current, type, size: job.bytes, sha256: hash.digest('hex'),
       name: filenameFrom(res.headers.get('content-disposition'), current) };
   }
@@ -159,6 +160,40 @@ async function githubLookup(gh, log, expectSha) {
   return { exact: null, alts: alts.slice(0, 8) };
 }
 
+// Every distinct saved copy of a file link in the Wayback Machine, newest first.
+// Copies with identical contents (same digest) are tried once, with a couple of spares in case the archive errors.
+const MAX_CAPTURE_GROUPS = 150;
+async function listCaptures(url, gh, h, log) {
+  const variants = [{ url, label: 'this link' }];
+  if (gh && gh.tag) {
+    variants.push({ url: `https://github.com/${gh.owner}/${gh.repo}/releases/latest/download/${encodeURIComponent(gh.name)}`,
+      label: 'the repo’s "latest release" link' });
+  }
+  const groups = new Map();
+  for (const v of variants) {
+    let rows = [];
+    try {
+      const cdx = 'https://web.archive.org/cdx/search/cdx?output=json&fl=timestamp,statuscode,digest&limit=-5000&url=' + encodeURIComponent(v.url);
+      const r = await h.fetchWithRetry(cdx);
+      rows = JSON.parse(r.body.toString('utf8') || '[]').slice(1);
+    } catch (e) { log(`Archive lookup failed for ${v.label} (${e.message})`); continue; }
+    for (const [ts, status, digest] of rows) {
+      if (/^[45]/.test(status)) continue; // saved error pages are never the file
+      const key = v.url + ' ' + digest;
+      if (!groups.has(key)) groups.set(key, { url: v.url, label: v.label, stamps: [] });
+      groups.get(key).stamps.push(ts);
+    }
+  }
+  const list = [...groups.values()].map(g => {
+    g.stamps.sort().reverse();
+    return { url: g.url, label: g.label, ts: g.stamps[0], spare: g.stamps.slice(1, 3) };
+  });
+  // Newest first; the exact link before the "latest release" variant on ties.
+  list.sort((a, b) => (b.ts.localeCompare(a.ts)) || (a.url === url ? -1 : 1));
+  if (list.length > MAX_CAPTURE_GROUPS) log(`Checking the newest ${MAX_CAPTURE_GROUPS} of ${list.length} saved versions`);
+  return list.slice(0, MAX_CAPTURE_GROUPS);
+}
+
 async function grabFile(job, h) {
   const { log } = h;
   let url = job.opts.startUrl;
@@ -207,27 +242,45 @@ async function grabFile(job, h) {
     if (job.opts.source === 'live') throw new Error('The live link did not work.');
   }
 
-  // 2. The Wayback Machine
+  // 2. The Wayback Machine: try every saved copy, newest first, until one is a complete, real file.
   job.status = 'searching archive';
-  log('Searching the Internet Archive for saved copies ...');
-  let stamps = [];
-  if (pinnedTs) stamps = [pinnedTs];
-  else {
-    try {
-      const cdx = 'https://web.archive.org/cdx/search/cdx?output=json&fl=timestamp,statuscode&filter=statuscode:[23]..&collapse=digest&limit=-10&url=' + encodeURIComponent(url);
-      const r = await h.fetchWithRetry(cdx);
-      stamps = JSON.parse(r.body.toString('utf8') || '[]').slice(1).map(x => x[0]).reverse();
-    } catch (e) { log(`Archive lookup failed (${e.message})`); }
+  log('Searching the Internet Archive for every saved copy ...');
+  const captures = pinnedTs ? [{ ts: pinnedTs, url, digests: null }] : await listCaptures(url, gh, h, log);
+  if (!captures.length) log('The archive has no saved copy of this link');
+  else if (!pinnedTs) log(`Found ${captures.length} different saved version${captures.length === 1 ? '' : 's'} - checking each one`);
+  let mismatch = null; // a complete file that failed the checksum, kept as a last resort
+  for (let i = 0; i < captures.length; i++) {
+    const c = captures[i];
+    if (job.cancelled) throw new Error('Cancelled');
+    job.archiveProgress = { tried: i + 1, of: captures.length };
+    log(`Snapshot ${i + 1}/${captures.length}: ${c.ts.length >= 8 ? day(c.ts) : 'closest to ' + c.ts}${c.url !== url ? ' (via ' + c.label + ')' : ''} ...`);
+    let got = null;
+    // Captures with the same contents are only re-tried when the archive itself failed (not when the file was bad).
+    for (const ts of [c.ts, ...(c.spare || [])]) {
+      try { got = await streamToFile('https://web.archive.org/web/' + ts + 'id_/' + c.url, job, { ...h, expectBinary }); break; }
+      catch (e) {
+        if (e.message === 'Cancelled') throw e;
+        log(`  failed (${e.message})`);
+        if (!/^(HTTP 5\d\d|HTTP 429|fetch failed|.*timeout.*|.*aborted.*|terminated)/i.test(e.message)) break;
+      }
+    }
+    if (!got) continue;
+    if (got.name === 'download' || /^\d+$/.test(got.name)) got.name = filenameFrom('', url);
+    if (expectSha && got.sha256 !== expectSha) {
+      log('  downloaded, but its checksum does not match the original page - trying older copies');
+      if (!mismatch) mismatch = { got, ts: c.ts };
+      else fs.rm(got.path, { force: true }, () => {});
+      continue;
+    }
+    if (mismatch) fs.rm(mismatch.got.path, { force: true }, () => {});
+    const real = (h.parseWayback(got.finalUrl) || {}).ts || c.ts;
+    return await finish(got, 'wayback', `Recovered from the Internet Archive copy saved ${day(real)}` +
+      (captures.length > 1 ? ` (snapshot ${i + 1} of ${captures.length} checked).` : '.'));
   }
-  if (!stamps.length) log('The archive has no saved copy of this exact link');
-  for (const ts of stamps.slice(0, 5)) {
-    log(`Trying archived copy ${ts.length >= 8 ? 'from ' + day(ts) : 'closest to ' + ts} ...`);
-    try {
-      const got = await streamToFile('https://web.archive.org/web/' + ts + 'id_/' + url, job, { ...h, expectBinary });
-      if (got.name === 'download' || /^\d+$/.test(got.name)) got.name = filenameFrom('', url);
-      const real = (h.parseWayback(got.finalUrl) || {}).ts || ts;
-      return await finish(got, 'wayback', `Recovered from the Internet Archive copy saved ${day(real)}.`);
-    } catch (e) { log(`  that copy failed (${e.message})`); if (e.message === 'Cancelled') throw e; }
+  if (mismatch) {
+    const real = (h.parseWayback(mismatch.got.finalUrl) || {}).ts || mismatch.ts;
+    log('No saved copy matched the checksum; keeping the newest complete one');
+    return await finish(mismatch.got, 'wayback', `Recovered from the Internet Archive copy saved ${day(real)}.`);
   }
 
   // 3. GitHub release lookup
